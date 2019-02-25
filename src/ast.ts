@@ -15,6 +15,11 @@ export interface Options {
   /** the name used for the input of pattern matching functions */
   matcheeName: string
   /**
+   * the constructor arguments can be expressed as positional arguments
+   * or a single object literal when using record syntax in constructor definition
+   */
+  constructorsArgumentsStyle: { type: 'positional' } | { type: 'record' }
+  /**
    * the pattern matching handlers can be expressed as positional arguments
    * or a single object literal `tag -> handler`
    */
@@ -26,6 +31,7 @@ export const defaultOptions: Options = {
   tagName: 'type',
   foldName: 'fold',
   matcheeName: 'fa',
+  constructorsArgumentsStyle: { type: 'positional' },
   handlersStyle: { type: 'positional' },
   encoding: 'literal'
 }
@@ -36,6 +42,7 @@ export const lenses: { [K in keyof Options]: Lens<Options, Options[K]> } = {
   tagName: getLens('tagName'),
   foldName: getLens('foldName'),
   matcheeName: getLens('matcheeName'),
+  constructorsArgumentsStyle: getLens('constructorsArgumentsStyle'),
   handlersStyle: getLens('handlersStyle'),
   encoding: getLens('encoding')
 }
@@ -426,15 +433,39 @@ const getLiteralNullaryConstructor = (c: M.Constructor, d: M.Data): AST<ts.Node>
   })
 }
 
+const getLiteralPositionalConstructorParameters = (c: M.Constructor): ts.ParameterDeclaration[] => {
+  return c.members.map((m, position) => {
+    const name = getMemberName(m, position)
+    const type = getTypeNode(m.type)
+    return getParameterDeclaration(name, type)
+  })
+}
+
+const getLiteralRecordConstructorParameters = (c: M.Constructor): ts.ParameterDeclaration[] => {
+  const type = ts.createTypeLiteralNode(
+    c.members.map((m, position) => {
+      const name = getMemberName(m, position)
+      const type = getTypeNode(m.type)
+      return getPropertySignature(name, type, false)
+    })
+  )
+  const binding = ts.createObjectBindingPattern(
+    c.members.map((m, position) => {
+      const name = getMemberName(m, position)
+      return ts.createBindingElement(undefined, undefined, name)
+    })
+  )
+  return [ts.createParameter(undefined, undefined, undefined, binding, undefined, type, undefined)]
+}
+
 const getLiteralConstructor = (c: M.Constructor, d: M.Data): AST<ts.Node> => {
   return new Reader(e => {
     const name = getFirstLetterLowerCase(c.name)
     const typeParameters = getDataTypeParameterDeclarations(d)
-    const parameters = c.members.map((m, position) => {
-      const name = getMemberName(m, position)
-      const type = getTypeNode(m.type)
-      return getParameterDeclaration(name, type)
-    })
+    const parameters =
+      e.constructorsArgumentsStyle.type === 'positional'
+        ? getLiteralPositionalConstructorParameters(c)
+        : getLiteralRecordConstructorParameters(c)
     const properties = c.members.map((m, position) => {
       const name = getMemberName(m, position)
       return ts.createShorthandPropertyAssignment(name)

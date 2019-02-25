@@ -12,6 +12,7 @@ const defaultSource = 'data Option A = None | Some A'
 interface Props {
   source: string
   encoding: Options['encoding']
+  constructorsArgumentsStyle: Options['constructorsArgumentsStyle']
   handlersStyle: Options['handlersStyle']
 }
 
@@ -19,11 +20,12 @@ interface State extends Props {
   code: string
 }
 
-const getState = (source: string, encoding: Options['encoding'], handlersStyle: Options['handlersStyle']): State => {
-  const options = lenses.handlersStyle.set(handlersStyle)(lenses.encoding.set(encoding)(defaultOptions))
+const getState = (source: string, encoding: Options['encoding'], constructorsArgumentsStyle: Options['constructorsArgumentsStyle'], handlersStyle: Options['handlersStyle']): State => {
+  const options = lenses.handlersStyle.set(handlersStyle)(lenses.constructorsArgumentsStyle.set(constructorsArgumentsStyle)(lenses.encoding.set(encoding)(defaultOptions)))
   return {
     source,
     encoding,
+    constructorsArgumentsStyle,
     handlersStyle,
     code: run(source, options).getOrElseL(e => `/** Error: ${e} */`)
   }
@@ -32,7 +34,7 @@ const getState = (source: string, encoding: Options['encoding'], handlersStyle: 
 class App extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props)
-    this.state = getState(props.source, props.encoding, props.handlersStyle)
+    this.state = getState(props.source, props.encoding, props.constructorsArgumentsStyle, props.handlersStyle)
   }
 
   render() {
@@ -40,24 +42,31 @@ class App extends React.Component<Props, State> {
       console.log(code)
     }
     const onCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      this.setState(getState(e.currentTarget.value, this.state.encoding, this.state.handlersStyle))
+      this.setState(getState(e.currentTarget.value, this.state.encoding, this.state.constructorsArgumentsStyle, this.state.handlersStyle))
     }
     const onEncodingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.currentTarget.checked) {
-        this.setState(getState(this.state.source, 'fp-ts', this.state.handlersStyle))
+        this.setState(getState(this.state.source, 'fp-ts', this.state.constructorsArgumentsStyle, this.state.handlersStyle))
       } else {
-        this.setState(getState(this.state.source, 'literal', this.state.handlersStyle))
+        this.setState(getState(this.state.source, 'literal', this.state.constructorsArgumentsStyle, this.state.handlersStyle))
+      }
+    }
+    const onConstructorsArgumentsStyleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.currentTarget.checked) {
+        this.setState(getState(this.state.source, this.state.encoding, { type: 'record' }, this.state.handlersStyle))
+      } else {
+        this.setState(getState(this.state.source, this.state.encoding, { type: 'positional' }, this.state.handlersStyle))
       }
     }
     const onHandlersStyleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.currentTarget.checked) {
-        this.setState(getState(this.state.source, this.state.encoding, { type: 'record', handlersName: 'handlers' }))
+        this.setState(getState(this.state.source, this.state.encoding, this.state.constructorsArgumentsStyle, { type: 'record', handlersName: 'handlers' }))
       } else {
-        this.setState(getState(this.state.source, this.state.encoding, { type: 'positional' }))
+        this.setState(getState(this.state.source, this.state.encoding, this.state.constructorsArgumentsStyle, { type: 'positional' }))
       }
     }
     const onExampleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      this.setState(getState(e.currentTarget.value, this.state.encoding, this.state.handlersStyle))
+      this.setState(getState(e.currentTarget.value, this.state.encoding, this.state.constructorsArgumentsStyle, this.state.handlersStyle))
     }
     return (
       <div>
@@ -76,6 +85,9 @@ class App extends React.Component<Props, State> {
               <td className="source">
                 <textarea rows={10} value={this.state.source} onChange={onCodeChange} />
                 <input type="checkbox" onChange={onEncodingChange} /> fp-ts encoding
+                <br />
+                <input type="checkbox" onChange={onConstructorsArgumentsStyleChange} /> constructor arguments style:{' '}
+                {this.state.constructorsArgumentsStyle.type}
                 <br />
                 <input type="checkbox" onChange={onHandlersStyleChange} /> fold handlers style:{' '}
                 {this.state.handlersStyle.type}
@@ -117,6 +129,6 @@ class App extends React.Component<Props, State> {
 }
 
 ReactDOM.render(
-  <App source={defaultSource} encoding="literal" handlersStyle={{ type: 'positional' }} />,
+  <App source={defaultSource} encoding="literal" constructorsArgumentsStyle={{ type: 'positional' }} handlersStyle={{ type: 'positional' }} />,
   document.getElementById('main')
 )

@@ -6,6 +6,8 @@ import { assertPrinterEqual } from './helpers'
 import { defaultOptions, lenses } from '../src/ast'
 
 describe('printer', () => {
+  const literalConstructorArgumentsRecord = lenses.constructorsArgumentsStyle.set({ type: 'record' })(defaultOptions)
+
   describe('literal encoding', () => {
     describe('data', () => {
       it('positional fields', () => {
@@ -186,6 +188,20 @@ describe('printer', () => {
           'export const nothing: Maybe<never> = { type: "Nothing" };',
           'export function just<A>(value: A): Maybe<A> { return { type: "Just", value }; }'
         ])
+      })
+
+      it('record fields - record arguments', () => {
+        assertPrinterEqual(
+          P.constructors,
+          E.Maybe,
+          [
+            'export const nothing: Maybe<never> = { type: "Nothing" };',
+            `export function just<A>({ value }: {
+    value: A;
+}): Maybe<A> { return { type: "Just", value }; }`
+          ],
+          literalConstructorArgumentsRecord
+        )
       })
 
       it('nullary constructors', () => {
